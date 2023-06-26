@@ -1,8 +1,8 @@
 FROM golang:alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
-ENV USER=user
-ENV UID=10001
+ARG USER=user
+ARG UID=10001
 RUN adduser \
     --disabled-password \
     --gecos "" \
@@ -16,9 +16,16 @@ COPY . .
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="-w -s" -o /go/bin/http-echo
 
 FROM scratch
+ARG UID=10001
+ENV HTTP_ECH0_PORT=80
+ENV HTTP_ECH0_TLS_PORT=443
+EXPOSE ${HTTP_ECH0_PORT}
+EXPOSE ${HTTP_ECH0_TLS_PORT}
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
-COPY --from=builder /go/bin/http-echo /go/bin/http-echo
 USER user:user
-EXPOSE 8080
+WORKDIR /go/bin/
+COPY --chown=${UID}:${UID} server.crt server.crt
+COPY --chown=${UID}:${UID} server.key server.key
+COPY --from=builder --chown=${UID}:${UID} /go/bin/http-echo http-echo
 ENTRYPOINT ["/go/bin/http-echo"]
